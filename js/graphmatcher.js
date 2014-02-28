@@ -2,78 +2,75 @@
 function GraphMatcher(graph, pattern) {
 
     function match() {
-        var pGraph = processModel(graph);
-        var pPattern = processModel(pattern);
+        var candidatesPerPatternPart = findLinksWithMatchingStartAndEndLabels();
+        console.log("candidates:");
+        console.log(candidatesPerPatternPart);
 
-        var candidatesPerPatternPart = findLinksWithMatchingStartAndEndLabels(pGraph, pPattern);
-        // console.log(candidatesPerPatternPart);
+        // candidatesPerPatternPart = removeDuplicatesAmongParts(candidatesPerPatternPart);
 
         if (candidatesPerPatternPart
                 .map(function(d) {return d.length > 0;})
-                .reduce(function(a,b) {return a && b;})) {
+                .reduce(and, true)) {
 
             var combn = combinations(candidatesPerPatternPart);
-            // console.log("combinations: " + JSON.stringify(combn));
-            return combn.filter(function (comb) {
-                var ok = true;
-                var mapping = {};
-                comb.forEach(function(rel, i) {
-                    // console.log(i);
-                    ok = ok 
-                        && checkInMapping(mapping, rel.source, pPattern[i].source)
-                        && checkInMapping(mapping, rel.target, pPattern[i].target);
-                    // console.log(mapping);
-                });
-                return ok;
-            });
+
+            console.log("Calculated " + combn.length + " combinations for [" 
+                + candidatesPerPatternPart.map(function(d){return d.length;}) 
+                + "] with " + graph.nodes.length + " nodes and " + graph.links.length + " rels");
+
+            return combn.filter(combinationMatchesPattern);
         }
         return [];
     }
 
     function checkInMapping(mapping, node, pnode) {
-        var patternSource = pnode;
-        var relSource = node;
-        var mappedSource = mapping[patternSource.index];
+        var mappedSource = mapping[pnode.index];
         if (mappedSource === undefined) {
-            mapping[patternSource.index] = relSource;
+            mapping[pnode.index] = node;
         return true;
         }
-        return mappedSource == relSource;
+        return mappedSource == node;
     }
-
-    //////
 
     function combinations(categories) {
-        if (categories.length == 1) return categories[0];
-        var result = [];
-        var firstCat = categories[0];
+        var firstCat = categories[0].map(function(d) {return [d];});
+        if (categories.length == 1) return firstCat;
         var restResult = combinations(categories.slice(1, categories.length));
-        for (var i = 0; i < firstCat.length; i++) {
-            result = result.concat(
-                restResult.map(function (d) {return [firstCat[i]].concat(d);}));
-        }
-        return result;
+        return firstCat.map(function(firstCatElem) {
+            return restResult.map(function (d) {return firstCatElem.concat(d);});
+        }).reduce(function(a,b) {return a.concat(b);}, []);
     }
 
-    function processModel(model) {
-        var pLinks = model.links.map(function(link) {
-            return {
-                source: link.source, 
-                target: link.target, 
-                sourceLabel: link.source.label, 
-                targetLabel: link.target.label
-            };
-        });
-        return pLinks;
-    }
-
-    function findLinksWithMatchingStartAndEndLabels(pGraph, pPattern) {
-        return pPattern.map(function(pLink) {
-            return pGraph.filter(function(link) {
-                return link.sourceLabel == pLink.sourceLabel && 
-                    link.targetLabel == pLink.targetLabel;
+    function findLinksWithMatchingStartAndEndLabels() {
+        return pattern.links.map(function(pLink) {
+            return graph.links.filter(function(link) {
+                return link.source.label == pLink.source.label && 
+                    link.target.label == pLink.target.label;
             });
         });
+    }
+
+    function combinationMatchesPattern(comb) {
+        if (!isUnique(comb)) return false; 
+        var mapping = {};
+        return comb.map(function(rel, i) {
+            return checkInMapping(mapping, rel.source, pattern.links[i].source)
+                && checkInMapping(mapping, rel.target, pattern.links[i].target);
+        }).reduce(and, true)
+    }
+
+    function isUnique(list) {
+        if (list.length < 2) return true;
+        var rest = list.slice(1, list.length);
+        if (!isUnique(rest)) return false;
+        for (var i = 0; i < rest.length; i++) {
+            if (rest[i] == list[0]) return false;
+        } 
+        return true;
+    }
+
+    function and(a,b) {
+        return a && b;
     }
 
     return {

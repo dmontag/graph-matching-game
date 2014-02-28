@@ -10,6 +10,7 @@
     <script type="text/javascript" src="bootstrap/js/bootstrap.js"></script>
 
     <script src="js/d3.v3.min.js" charset="utf-8"></script>
+    <script src="js/seedrandom.js" charset="utf-8"></script>
     <script src="js/models.js" charset="utf-8"></script>
     <script src="js/levels.js" charset="utf-8"></script>
     <script src="js/modelviz.js" charset="utf-8"></script>
@@ -46,6 +47,12 @@ body {
     stroke-opacity: .8;
 }
 
+.arrowheadFound {
+    stroke: red;
+    fill: red;
+    stroke-opacity: .8;
+}
+
 .patternNode {
     stroke: #444;
     stroke-width: 2px;
@@ -56,45 +63,58 @@ body {
     stroke-opacity: .8;
 }
 
-/*.pattern {
-    opacity: 0.5;
+.patternSvg {
+    border: 1px solid #ccc;
+    margin-bottom: 1em;
 }
-*/
+
+.gameSvg {
+    border: 1px solid #bbb;
+}
+
+.sidebar {
+    border: 1px solid #bbb;
+    padding: 10px;
+    ;
+}
+
+.scoreRow {
+    /*padding-top: 1em;*/
+    padding-bottom: 1em;
+}
+
 .hidden {
     display: none;
 }
 
-.question {
+.banner {
+    position:absolute;
+    top: 25%;
+    left: 50%;
+    width: 100%;
+    margin: auto;
+    text-align: center;
+
+    font-size: 3em;
     font-weight: bold;
+    opacity: 0.7;
+    pointer-events: none;
+
+    transform: translate(-50%, -50%);    
+    -webkit-transform: translate(-50%, -50%);
+    -moz-transform: translate(-50%, -50%);
+    -ms-transform: translate(-50%, -50%);  
 }
 
-.questionBlock {
-    padding-top: 1em;
-}
-
-.answer {    
-    margin-top: 10px;
-}
-
-.result {
-    padding-left: 1em;
-    display: inline-block; 
-    vertical-align: middle;
-    font-style: italic;
-}
-
-.congrats {
-    font-weight: bold;
-}
-
-.tip {
-    font-style: italic;
-    font-size: 0.8em;
+.instructions {
+    font-size: 0.9em;
 }
 
 </style>
 
 <script type="text/javascript">
+
+Math.seedrandom("1");
 
 var activeLevel = 0;
 
@@ -114,16 +134,130 @@ $(document).ready(function() {
         patternNodeRadius: 5
     };
 
-    new ModelViz(settings, ".game", ".pattern");
+    var seedLevel = {
+        numNodes: 20,
+        numVisible: 1,
+        relsPerNode: [2, 4],
+        pattern: {
+            nodes: [
+                {label: 0},
+                {label: 0}
+            ],
+            links: [
+                {source: 0, target: 1}
+            ]
+        },
+        _evo: 1
+    };
+    seedLevel.numLabels = seedLevel.numLabels || countLabels(seedLevel);
+
+    renderLevel(settings, seedLevel, ".game", ".pattern", ".score", ".level");
 
 });
+
+var totalClicks = 0;
+var model = {destroy: function(){}};
+function renderLevel(settings, level, 
+        gameContainer, patternContainer, scoreContainer, levelContainer) {
+    model.destroy();
+    model = new ModelViz(settings, gameContainer, patternContainer, level, function(won, clicks) {
+        if (won) {
+            totalClicks += clicks;
+            $(".banner").text("Pattern found in " + clicks + " clicks");
+        } else {
+            $(".banner").text("Walk-over since pattern did not exist");
+        }
+        $(scoreContainer).text(totalClicks);
+        setTimeout(function() {
+            $(".banner").text("");
+            evolveLevel(level);
+            $(levelContainer).text(level._evo);
+            renderLevel(settings, level, gameContainer, patternContainer, scoreContainer, levelContainer);
+        }, 3000);
+    });
+}
+
+function evolveLevel(level) {
+    var evo = level._evo;
+    level._evo += 1;
+    console.log(level._evo);
+    if (evo % 3 == 0) level.numNodes *= 1.5;
+    if (evo % 4 == 2) {
+        var newNode = {};
+        level.pattern.links.push({
+            source: newNode, 
+            target: level.pattern.nodes[Math.floor(Math.random()*level.pattern.nodes.length)]
+        });
+        level.pattern.nodes.push(newNode);
+    }
+    if (evo % 4 == 0) level.numVisible +=1;
+    if (evo % 10 == 1) level.numLabels += 1;
+    if (evo % 6 == 0) level.relsPerNode[1] += 1;
+    level.pattern.nodes.forEach(function(d) {
+        d.label = Math.floor(Math.random()*level.numLabels);
+    });
+}
+
+function countLabels(level) {
+    var mapping = {};
+    level.pattern.nodes.forEach(function(d) {return mapping[d.label] = true;});
+    return $.map(mapping, function(k) { return 1; })
+        .reduce(function(a,b) {return a+b;});
+}
+
+
 
     </script>
 </head>
 <body>
-<div class="row-fluid">
-    <div class="span2 pattern"></div>
-    <div class="span10 game"></div>
-</div>
+<div class="container">
+    <h1>Exercise your graph thinking muscle</h1>
+    <div class="row-fluid">
+        <div class="span2 sidebar">
+            <div class="row-fluid">
+                <strong>Level:</strong> <span class="level">1</span>
+            </div>
+            <div class="row-fluid scoreRow">
+                <strong>Clicks:</strong> <span class="score">0</span>
+            </div>
+            <div class="row-fluid">
+                <div class="span12"><strong>Find this pattern:</strong></div>
+            </div>
+            <div class="row-fluid">
+                <div class="span12 pattern"></div>
+            </div>
+            <div class="row-fluid">
+                <div class="span12 instructions">
+                    <p>
+                        <strong>Instructions</strong>
+                    </p>
+                    <p>
+                        Explore the graph on the right by clicking the nodes. 
+                    </p>
+                    <p>
+                        The objective is to find the pattern below in as few clicks as possible.
+                    </p>
+                    <p>
+                        After completing a level, the game will automatically advance to the next.
+                    </p>
+                    <p>
+                        Drag the canvas to pan, and scroll to zoom.
+                    </p>
+                    <p>
+                        Hint: Relationships always point out from the clicked node.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="span10">
+            <div class="row-fluid">
+                <div class="span12" style="position:relative;">
+                    <div class="game"></div>
+                    <div class="banner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 
 </body>
 </html>

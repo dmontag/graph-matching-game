@@ -1,9 +1,10 @@
 var modelVizInstanceCounter = 0;
-function ModelViz(settings, parent, patternParent, model) {
+function ModelViz(settings, parent, patternParent, level, callback) {
 
     var instance = modelVizInstanceCounter++;
 
     var clicks = 0;
+    var done = false;
 
     var scale = d3.scale.category10();
 
@@ -21,9 +22,11 @@ function ModelViz(settings, parent, patternParent, model) {
         .size([settings.patternWidth, settings.patternHeight]);
 
 
-    var svg = d3.select(parent || "body").append("svg")
+    var realSvg = d3.select(parent || "body").append("svg")
         .attr("width", settings.width)
         .attr("height", settings.height)
+        .attr("class", "gameSvg");
+    var svg = realSvg
         .append("g")
             .call(d3.behavior.zoom().scaleExtent([0.2, 1]).on("zoom", zoom))
         .append("g");
@@ -38,7 +41,8 @@ function ModelViz(settings, parent, patternParent, model) {
 
     var patternSvg = d3.select(patternParent || "body").append("svg")
         .attr("width", settings.patternWidth)
-        .attr("height", settings.patternHeight);
+        .attr("height", settings.patternHeight)
+        .attr("class", "patternSvg");
     var patternGroup = patternSvg.append("g")
         .attr("class", "pattern")
         .attr("x", 20)
@@ -53,66 +57,29 @@ function ModelViz(settings, parent, patternParent, model) {
 
     var link, node, patternLink, patternNode;
 
-    svg.append('svg:defs')
-        .append('svg:marker')
-            .attr('viewBox', '0 -4 10 10')
-            .attr('refX', 15+settings.nodeRadius).attr('refY', 0)
-            .attr('markerWidth', 7)
-            .attr('markerHeight', 7)
-            .attr("id", "end-marker-" + instance)
-            .attr('orient', 'auto')
-            .append('svg:path')
-                .attr('d', 'M0,-4L10,0L0,4')
-                .attr('class', 'arrowhead');
+    createMarker("end-marker-" + instance, "arrowhead", settings.nodeRadius);
+    createMarker("end-marker-found-" + instance, "arrowheadFound", settings.nodeRadius);
+    createMarker("pattern-end-marker-" + instance, "arrowhead", settings.patternNodeRadius);
 
-
-    svg.append('svg:defs')
-        .append('svg:marker')
-            .attr('viewBox', '0 -4 10 10')
-            .attr('refX', 15+settings.patternNodeRadius).attr('refY', 0)
-            .attr('markerWidth', 7)
-            .attr('markerHeight', 7)
-            .attr("id", "pattern-end-marker-" + instance)
-            .attr('orient', 'auto')
-            .append('svg:path')
-                .attr('d', 'M0,-4L10,0L0,4')
-                .attr('class', 'arrowhead');
-
-
-    if (model === undefined) {
-        model = {
-            nodes: [],
-            links: []
-        };
-
-        var numNodes = 100;
-        var numLabels = 3;
-        var randomNode = d3.scale.pow().range([0,numNodes-1]).exponent(0.5);
-        var numRelsPerNode = d3.scale.pow().range([2,6]).exponent(0.5);
-        model.nodes = d3.range(numNodes).map(function() {
-            return {label: Math.floor(Math.random() * numLabels), rels: Math.floor(numRelsPerNode(Math.random()))};
-        });
-        model.nodes[0]._visible = true;
-        model.links = [];
-    }
-
-
-    var pattern = {
-        nodes: [
-            {label: 0},
-            {label: 1},
-            {label: 2}
-        ],
-        links: [
-            {source: 0, target: 1},
-            {source: 0, target: 2}
-        ]
+    var model = {
+        nodes: [],
+        links: []
     };
+
+    var numNodes = level.numNodes;
+    var numLabels = level.numLabels;
+    var randomNode = d3.scale.pow().range([0,numNodes-1]).exponent(0.5);
+    var numRelsPerNode = d3.scale.pow().range(level.relsPerNode).exponent(0.5);
+    model.nodes = d3.range(numNodes).map(function() {
+        return {label: Math.floor(Math.random() * numLabels), rels: Math.floor(numRelsPerNode(Math.random()))};
+    });
+    model.nodes.slice(0, level.numVisible).forEach(function(d) {d._visible = true});
+    model.links = [];
+    
+    var pattern = level.pattern;
 
     prepareModel(model);
     prepareModel(pattern);
-
-    // console.log(model);
 
     function prepareModel(m) {
         m.links.forEach(function(l) {
@@ -139,10 +106,13 @@ function ModelViz(settings, parent, patternParent, model) {
             .start();
 
         link = linkGroup.selectAll(".link")
-            .data(links);
+            .data(links)
+            .style("stroke", linkStroke)
+            .attr('marker-end', linkMarker);
         link.enter().append("line")
             .attr("class", "link")
-            .attr('marker-end', "url(#end-marker-" + instance + ")");
+            .style("stroke", linkStroke)
+            .attr('marker-end', linkMarker);
         link.exit().remove();
 
         node = nodeGroup.selectAll(".node")
@@ -187,6 +157,24 @@ function ModelViz(settings, parent, patternParent, model) {
         node._expanded = true;
         clicks += 1;
 
+        addLinksToNode(node);
+
+        update();
+
+        matchPattern(getActiveModel(), pattern);
+
+        if (!done && model.nodes.filter(function(d) {
+                return d._expanded;
+            }).length == model.nodes.filter(function(d) {
+                return d._visible;
+            }).length) {
+            callback(false, clicks);
+        }
+
+        update();
+    }
+
+    function addLinksToNode(node) {
         var numMissingLinks = node.rels - getNeighborLinks(node).length;
         if (numMissingLinks > 0) {
             connectNodeToNeighbors(node, numMissingLinks);
@@ -194,47 +182,39 @@ function ModelViz(settings, parent, patternParent, model) {
         getNeighborLinks(node).forEach(function(link) {
             show(getOtherNode(node, link));
         });
-
-        update();
-
-        matchPattern(getActiveModel(), pattern);
-
-        update();
-    }
-
-    function connectNodeToNeighbors(node, relCount) {
-        for (var i = 0; i < relCount; i++) {
-            var newLink;
-            do {
-                newLink = {source: node, target: getRandomNode()};
-            } while (newLink.source == newLink.target || $.grep(model.links, function (d) {
-                return d.source == newLink.source && d.target == newLink.target;
-            }).length > 0);
-            model.links.push(newLink);
-        }
-    }
-
-    function getRandomNodeButNot(node) {
-        var randomNode;
-        do {
-            randomNode = getRandomNode();
-        } while (randomNode == node);
-        return randomNode;
-    }
-
-    function getRandomNode() {
-        // var index = Math.floor(Math.random() * model.nodes.length);
-        var index = Math.floor(randomNode(Math.random()));
-        return model.nodes[index];
     }
 
     function show(node) {
         node._visible = true;
-        // var neighbors = getNeighborNodes(node);
-        // var numExpandedNeighbors = neighbors.filter(function(node) { return node._expanded; }).length;
-        // if (neighbors.length == numExpandedNeighbors) {
-        //     node._expanded = true;
-        // }
+    }
+
+    function connectNodeToNeighbors(node, relCount) {
+        for (var i = 0; i < relCount; i++) {
+            var otherNode, newLink, tries = 0;
+            do {
+                otherNode = getRandomNode();
+                newLink = {source: node, target: otherNode};
+            } while (
+                (tries++ < model.nodes.length) 
+                && (
+                    newLink.source == newLink.target 
+                    || linkExistsBetween(node, otherNode)
+                )
+            );
+            model.links.push(newLink);
+        }
+    }
+
+    function linkExistsBetween(node1, node2) {
+        return model.links.filter(function(link) {
+            return (link.source === node1 && link.target === node2) 
+                || (link.source === node2 && link.target === node1) 
+        }).length > 0;
+    }
+
+    function getRandomNode() {
+        var index = Math.floor(randomNode(Math.random()));
+        return model.nodes[index];
     }
 
     function getNeighborLinks(node) {
@@ -271,8 +251,30 @@ function ModelViz(settings, parent, patternParent, model) {
         return scale(d);
     }
 
+    function linkStroke(d) {
+        return d.found ? "red" : "#999";
+    }
+
+    function linkMarker(d) {
+        return d.found ? "url(#end-marker-found-" + instance + ")" : "url(#end-marker-" + instance + ")";
+    }
+
     function strokeDasharray(d) {
         return d._expanded ? "0" : "2.5";
+    }
+
+    function createMarker(id, klass, radius) {
+        svg.append('svg:defs')
+            .append('svg:marker')
+                .attr('viewBox', '0 -4 10 10')
+                .attr('refX', 15+radius).attr('refY', 0)
+                .attr('markerWidth', 7)
+                .attr('markerHeight', 7)
+                .attr("id", id)
+                .attr('orient', 'auto')
+                .append('svg:path')
+                    .attr('d', 'M0,-4L10,0L0,4')
+                    .attr('class', klass);
     }
 
     function tick(e) {
@@ -300,7 +302,9 @@ function ModelViz(settings, parent, patternParent, model) {
 
     function destroy() {
         force.stop();
-        svg.remove();
+        patternForce.stop();
+        realSvg.remove();
+        patternSvg.remove();
     }
 
     function getActiveModel() {
@@ -309,21 +313,22 @@ function ModelViz(settings, parent, patternParent, model) {
         activeModel.links = model.links.filter(function(d) {
             return $.inArray(d.source, activeModel.nodes) >= 0 && $.inArray(d.target, activeModel.nodes) >= 0;
         });
-        console.log(activeModel);
         return activeModel;
     }
 
     function matchPattern(graph, pattern) {
-        console.log(graph);
+        if (done) return;
         var match = new GraphMatcher(graph, pattern).match();
         if (match.length > 0) {
-            console.log(match);
             match[0].forEach(function(r) {
-                console.log("matched rel:");
-                console.log(r);
                 graph.nodes[r.source.index].found = true;
                 graph.nodes[r.target.index].found = true;
+                graph.links.filter(function(d) {
+                    return d.source.index == r.source.index && d.target.index == r.target.index;
+                }).forEach(function(d) {d.found = true;});
             });
+            done = true;
+            callback(true, clicks);
         }
     }
 
