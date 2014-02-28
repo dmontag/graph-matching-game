@@ -169,8 +169,11 @@ function renderLevel(settings, level,
         }
         $(scoreContainer).text(totalClicks);
         setTimeout(function() {
-            $(".banner").text("");
             evolveLevel(level);
+            $(".banner").text("Level "+level._evo);
+            setTimeout(function(){
+                $(".banner").text("");
+            }, 2000);
             $(levelContainer).text(level._evo);
             renderLevel(settings, level, gameContainer, patternContainer, scoreContainer, levelContainer);
         }, 3000);

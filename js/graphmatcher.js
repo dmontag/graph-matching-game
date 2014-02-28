@@ -3,10 +3,6 @@ function GraphMatcher(graph, pattern) {
 
     function match() {
         var candidatesPerPatternPart = findLinksWithMatchingStartAndEndLabels();
-        console.log("candidates:");
-        console.log(candidatesPerPatternPart);
-
-        // candidatesPerPatternPart = removeDuplicatesAmongParts(candidatesPerPatternPart);
 
         if (candidatesPerPatternPart
                 .map(function(d) {return d.length > 0;})
