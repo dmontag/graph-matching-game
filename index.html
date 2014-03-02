@@ -114,7 +114,8 @@ body {
 
 <script type="text/javascript">
 
-Math.seedrandom("1");
+var seed = window.location.hash == "" ? "1" : window.location.hash;
+Math.seedrandom(seed);
 
 var activeLevel = 0;
 
