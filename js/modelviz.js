@@ -163,13 +163,7 @@ function ModelViz(settings, parent, patternParent, level, callback) {
 
         matchPattern(getActiveModel(), pattern);
 
-        if (!done && model.nodes.filter(function(d) {
-                return d._expanded;
-            }).length == model.nodes.filter(function(d) {
-                return d._visible;
-            }).length) {
-            callback(false, clicks);
-        }
+        checkWalkoverCondition();
 
         update();
     }
@@ -329,6 +323,18 @@ function ModelViz(settings, parent, patternParent, level, callback) {
             });
             done = true;
             callback(true, clicks);
+        }
+    }
+
+    function checkWalkoverCondition() {
+        if (!done 
+            && model.nodes.filter(function(d) {
+                    return d._expanded;
+                }).length 
+                == model.nodes.filter(function(d) {
+                    return d._visible;
+                }).length) {
+            callback(false, clicks);
         }
     }
 
