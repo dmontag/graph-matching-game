@@ -186,12 +186,14 @@ function evolveLevel(level) {
     if (evo % 3 == 0) level.numNodes *= 1.5;
     if (evo % 4 == 2) {
         var newNode = {};
+        var randomNode = level.pattern.nodes[Math.floor(Math.random()*level.pattern.nodes.length)];
+        var outgoing = Math.random() < 0.5;
         level.pattern.links.push({
-            source: newNode, 
-            target: level.pattern.nodes[Math.floor(Math.random()*level.pattern.nodes.length)]
+            source: outgoing ? newNode : randomNode,
+            target: outgoing ? randomNode : newNode
         });
         level.pattern.nodes.push(newNode);
-    }
+    }    
     if (evo % 4 == 0) level.numVisible +=1;
     if (evo % 10 == 1) level.numLabels += 1;
     if (evo % 6 == 0) level.relsPerNode[1] += 1;
@@ -222,6 +224,7 @@ function countLabels(level) {
             <div class="row-fluid scoreRow">
                 <strong>Clicks:</strong> <span class="score">0</span>
             </div>
+
             <div class="row-fluid">
                 <div class="span12"><strong>Find this pattern:</strong></div>
             </div>
