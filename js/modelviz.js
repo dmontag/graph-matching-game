@@ -127,7 +127,8 @@ function ModelViz(settings, parent, patternParent, level, callback) {
                 .style("fill", nodeColor)
                 .style("stroke", nodeStroke)
                 .style("stroke-dasharray", strokeDasharray)
-                .on("click", expand)
+                .on("click", nodeClick)
+                .on("dblclick", nodeDoubleClick)
                 .call(force.drag);
         node.exit().remove();
 
@@ -152,12 +153,22 @@ function ModelViz(settings, parent, patternParent, level, callback) {
 
     }
 
-    function expand(node) {
+    function nodeClick(node) {
+        setTimeout(function() {
+            expand(node, true);
+        }, 250);
+    }
+
+    function nodeDoubleClick(node) {
+        expand(node, false);
+    }
+
+    function expand(node, outgoing) {
         if (node._expanded === true) return;
         node._expanded = true;
         clicks += 1;
 
-        addLinksToNode(node);
+        addLinksToNode(node, outgoing);
 
         update();
 
@@ -168,10 +179,10 @@ function ModelViz(settings, parent, patternParent, level, callback) {
         update();
     }
 
-    function addLinksToNode(node) {
+    function addLinksToNode(node, outgoing) {
         var numMissingLinks = node.rels - getNeighborLinks(node).length;
         if (numMissingLinks > 0) {
-            connectNodeToNeighbors(node, numMissingLinks);
+            connectNodeToNeighbors(node, numMissingLinks, outgoing);
         }
         getNeighborLinks(node).forEach(function(link) {
             show(getOtherNode(node, link));
@@ -182,12 +193,15 @@ function ModelViz(settings, parent, patternParent, level, callback) {
         node._visible = true;
     }
 
-    function connectNodeToNeighbors(node, relCount) {
+    function connectNodeToNeighbors(node, relCount, outgoing) {
         for (var i = 0; i < relCount; i++) {
             var otherNode, newLink, tries = 0;
             do {
                 otherNode = getRandomNode();
-                newLink = {source: node, target: otherNode};
+                newLink = {
+                    source: outgoing ? node : otherNode, 
+                    target: outgoing ? otherNode : node
+                };
             } while (
                 (tries++ < model.nodes.length) 
                 && (
@@ -313,6 +327,10 @@ function ModelViz(settings, parent, patternParent, level, callback) {
     function matchPattern(graph, pattern) {
         if (done) return;
         var match = new GraphMatcher(graph, pattern).match();
+        checkFoundCondition(graph, match);
+    }
+
+    function checkFoundCondition(graph, match) {
         if (match.length > 0) {
             match[0].forEach(function(r) {
                 graph.nodes[r.source.index].found = true;
@@ -324,6 +342,7 @@ function ModelViz(settings, parent, patternParent, level, callback) {
             done = true;
             callback(true, clicks);
         }
+
     }
 
     function checkWalkoverCondition() {
