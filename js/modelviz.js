@@ -29,6 +29,7 @@ function ModelViz(settings, parent, patternParent, level, callback) {
     var svg = realSvg
         .append("g")
             .call(d3.behavior.zoom().scaleExtent([0.2, 1]).on("zoom", zoom))
+            .on("dblclick.zoom", null)
         .append("g");
 
     svg.append("rect")

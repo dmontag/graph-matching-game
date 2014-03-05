@@ -133,6 +133,30 @@ $(document).ready(function() {
         patternNodeRadius: 5
     };
 
+    var hardLevel = {
+        numNodes: 200,
+        numVisible: 5,
+        relsPerNode: [2, 10],
+        pattern: {
+            nodes: [
+                {label: 0},
+                {label: 1},
+                {label: 2},
+                {label: 3},
+                {label: 4}
+            ],
+            links: [
+                {source: 0, target: 1},
+                {source: 1, target: 2},
+                {source: 0, target: 2},
+                {source: 2, target: 3},
+                {source: 2, target: 4},
+                {source: 3, target: 4}            
+            ]
+        },
+        _evo: 1
+    };
+
     var seedLevel = {
         numNodes: 20,
         numVisible: 1,
@@ -148,7 +172,6 @@ $(document).ready(function() {
         },
         _evo: 1
     };
-    seedLevel.numLabels = seedLevel.numLabels || countLabels(seedLevel);
 
     renderLevel(settings, seedLevel, ".game", ".pattern", ".score", ".level");
 
@@ -158,6 +181,7 @@ var totalClicks = 0;
 var model = {destroy: function(){}};
 function renderLevel(settings, level, 
         gameContainer, patternContainer, scoreContainer, levelContainer) {
+    level.numLabels = level.numLabels || countLabels(level);
     model.destroy();
     model = new ModelViz(settings, gameContainer, patternContainer, level, function(won, clicks) {
         if (won) {

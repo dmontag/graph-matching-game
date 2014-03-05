@@ -23,7 +23,7 @@ function GraphMatcher(graph, pattern) {
         var mappedSource = mapping[pnode.index];
         if (mappedSource === undefined) {
             mapping[pnode.index] = node;
-        return true;
+            return true;
         }
         return mappedSource == node;
     }
