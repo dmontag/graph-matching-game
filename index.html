@@ -183,7 +183,7 @@ function evolveLevel(level) {
     var evo = level._evo;
     level._evo += 1;
     console.log(level._evo);
-    if (evo % 3 == 0) level.numNodes *= 1.5;
+    if (evo % 3 == 0) level.numNodes *= 1.3;
     if (evo % 4 == 2) {
         var newNode = {};
         var randomNode = level.pattern.nodes[Math.floor(Math.random()*level.pattern.nodes.length)];
